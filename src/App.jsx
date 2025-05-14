@@ -6,17 +6,20 @@ import "jspdf-autotable"; // Optional: For automatic table generation
 function App() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState(null);
+  const [Metadetails, setMetadetails] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [whoisData, setWhoisData] = useState(null);
+  const [whoisData, setWhoisData] = useState("");
   const [httpsData, setHttpsData] = useState(null);
+  const [backlinkData, setBacklinkData] = useState(null);
 
-  const whoIsinfo = () => {
+  const whoIsinfo = async () => {
     try {
-      const response = axios.post("http://localhost:5000/api/whois", {
-        url,
+      const response = await axios.post("http://localhost:5000/api/whois", {
+        url: url,
       });
-      setWhoisData(response.data);
+      setWhoisData(response.data); // Store clean WHOIS data
+      console.log("WHOIS Data:", response.data);
     } catch (error) {
       console.error("Error fetching WHOIS data:", error);
       setError("Failed to fetch WHOIS data.");
@@ -29,32 +32,59 @@ function App() {
         siteUrl: url,
       });
       setHttpsData(res.data);
-      console.log(res.data);
-
-      console.log(httpsData);
+      console.log("HTTPS Data:", httpsData);
     } catch (error) {
       console.log("Error fetching HTTPS data:", error);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const PageSpeed = async () => {
     setError("");
     setResult(null);
-    setLoading(true);
 
     try {
       const res = await axios.post("http://localhost:5000/api/seo-audit", {
         url,
       });
       setResult(res.data);
-      httpsCheck();
-      whoIsinfo();
-      console.log(JSON.parse(whoisData));
-
-      console.log(result);
     } catch (err) {
       setError("Failed to fetch results. Please enter a valid URL.");
+    }
+  };
+
+  const metataganalysis = async () => {
+    setError("");
+    setMetadetails(null);
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/metataganalysis",
+        {
+          url,
+        }
+      );
+      setMetadetails(res.data);
+      console.log("Meta Tag Analysis Result:", res.data);
+    } catch (err) {
+      setError("Failed to fetch results. Please enter a valid URL.");
+    }
+  };
+
+  const backlinkAnalysis = async () => {
+    setError("");
+    setBacklinkData(null);
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/backlinkanalysis",
+        {
+          siteUrl: url,
+        }
+      );
+      setBacklinkData(res.data.backlinkData);
+      console.log("Backlink Analysis Result:", backlinkData);
+    } catch (err) {
+      setError(
+        "Backlink analysis Failed to fetch results. Please enter a valid URL."
+      );
     }
   };
 
@@ -128,18 +158,38 @@ function App() {
 
   const downloadPDF = () => {
     const doc = new jsPDF();
+    let y = 20;
+
+    // Section Title Style
+    const addSectionTitle = (title) => {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(title, 20, y);
+      y += 6;
+      doc.setDrawColor(0);
+      doc.line(20, y, 190, y); // border-bottom
+      y += 10;
+    };
+
+    // Regular text style
+    const addText = (label, value) => {
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${label}: ${value || "N/A"}`, 20, y);
+      y += 8;
+    };
 
     doc.setFontSize(18);
-    doc.text("SEO Audit Results", 20, 20);
+    doc.setFont("helvetica", "bold");
+    doc.text("SEO Audit Results", 20, y);
+    y += 10;
 
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
-    doc.text(
-      `Final URL: ${result?.lighthouseResult?.finalUrl || "N/A"}`,
-      20,
-      30
-    );
+    addText("Final URL", result?.lighthouseResult?.finalUrl);
 
-    doc.text("Categories:", 20, 40);
+    // Categories Section
+    addSectionTitle("Lighthouse Categories");
     const categories = [
       { label: "Performance", category: "performance" },
       { label: "Accessibility", category: "accessibility" },
@@ -147,17 +197,13 @@ function App() {
       { label: "SEO", category: "seo" },
     ];
 
-    categories.forEach((cat, index) => {
+    categories.forEach((cat) => {
       const score = getScore(cat.category);
-      doc.text(
-        `${cat.label}: ${score !== null ? `${score}%` : "N/A"}`,
-        20,
-        50 + index * 10
-      );
+      addText(cat.label, score !== null ? `${score}%` : "N/A");
     });
 
-    // Adding the strategy section
-    doc.text("Strategy:", 20, 100);
+    // Strategy Metrics Section
+    addSectionTitle("Core Web Vitals / Strategy");
     const strategyItems = [
       { label: "First Contentful Paint", key: "first-contentful-paint" },
       { label: "Largest Contentful Paint", key: "largest-contentful-paint" },
@@ -167,17 +213,78 @@ function App() {
       { label: "Cumulative Layout Shift", key: "cumulative-layout-shift" },
     ];
 
-    strategyItems.forEach((item, index) => {
-      doc.text(
-        `${item.label}: ${
-          result?.lighthouseResult?.audits[item.key]?.displayValue || "N/A"
-        }`,
-        20,
-        110 + index * 10
+    strategyItems.forEach((item) => {
+      addText(
+        item.label,
+        result?.lighthouseResult?.audits[item.key]?.displayValue
       );
     });
 
+    // HTTPS Check
+    if (httpsData) {
+      addSectionTitle("HTTPS Check Result");
+      addText("Is HTTPS", httpsData.isHTTPS ? "Yes" : "No");
+      addText("Secure", httpsData.secure ? "Yes" : "No");
+      addText("Message", httpsData.message);
+
+      if (httpsData.certificate) {
+        addText("Valid From", httpsData.certificate.validFrom);
+        addText("Valid To", httpsData.certificate.validTo);
+        addText("Days Left", `${httpsData.certificate.daysLeft} day(s)`);
+      }
+    }
+
+    // WHOIS Data
+    if (whoisData) {
+      addSectionTitle("WHOIS Information");
+      addText("Domain Name", whoisData.domainName);
+      addText("Owner", whoisData.owner);
+      addText("Registrar", whoisData.registrar);
+    }
+
+    // Meta Tag Analysis
+    if (Metadetails?.success) {
+      addSectionTitle("Meta Tag Analysis");
+
+      const meta = Metadetails.meta;
+      addText("Charset", meta.charset);
+      addText("Viewport", meta.viewport);
+      addText("Description", meta.description);
+      addText("Keywords", meta.keywords);
+      addText("Title", meta.title);
+      addText("Canonical", meta.canonical);
+      addText("Robots", meta.robots);
+      addText("OG Title", meta.ogTitle);
+      addText("OG Image", meta.ogImage);
+      addText("Twitter Title", meta.twitterTitle);
+      addText("Twitter Description", meta.twitterDescription);
+      addText("Twitter Image", meta.twitterImage);
+    }
+
     doc.save("seo-audit-result.pdf");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setResult(null);
+    // setBacklinkData(null);
+    setHttpsData(null);
+    setMetadetails(null);
+    setWhoisData(null);
+
+    try {
+      await PageSpeed();
+      whoIsinfo();
+      await httpsCheck();
+      await metataganalysis();
+      //await backlinkAnalysis();
+    } catch (err) {
+      console.log("Error during analysis:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -185,92 +292,158 @@ function App() {
       <h2 className="text-center mb-4">SEO Audit Tool with PageSpeed API</h2>
 
       <form onSubmit={handleSubmit} className="mb-4">
-        <div className="mb-3">
+        <div className="input-group">
           <input
-            type="url"
-            className="form-control rounded-pill"
+            type="text"
+            className="form-control"
             placeholder="Enter website URL (e.g., https://example.com)"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             required
           />
+          <button type="submit" className="btn btn-primary">
+            {loading ? (
+              <>
+                <span
+                  className="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
+                Auditing...
+              </>
+            ) : (
+              "Run Audit"
+            )}
+          </button>
         </div>
-        <button
-          type="submit"
-          className="btn btn-primary w-100 rounded-pill"
-          disabled={loading}
-        >
-          {loading ? "Analyzing..." : "Analyze"}
-        </button>
       </form>
 
-      {error && <div className="alert alert-danger">{error}</div>}
+      {error && (
+        <div className="alert alert-danger text-center" role="alert">
+          {error}
+        </div>
+      )}
 
-      {result && result.lighthouseResult && (
-        <div className="card shadow">
-          <div className="card-header bg-primary text-white">
-            SEO Audit Results
+      {result && (
+        <>
+          <div className="row text-center">
+            {renderCategory("Performance", "performance")}
+            {renderCategory("Accessibility", "accessibility")}
+            {renderCategory("Best Practices", "best-practices")}
+            {renderCategory("SEO", "seo")}
           </div>
-          <div className="card-body">
-            <p>
-              <strong>Final URL:</strong> {result.lighthouseResult.finalUrl}
-              <br />
-              <strong>Report as on:</strong>
-              {result.analysisUTCTimestamp}
-            </p>
 
-            <div className="row">
-              {renderCategory("Performance", "performance")}
-              {renderCategory("Accessibility", "accessibility")}
-              {renderCategory("Best Practices", "best-practices")}
-              {renderCategory("SEO", "seo")}
+          <div className="text-center mt-4">
+            <button className="btn btn-primary" onClick={downloadPDF}>
+              Download PDF Report
+            </button>
+          </div>
+
+          <div className="mt-5">
+            <h4 className="mb-3">Detailed Metrics</h4>
+            <ul className="list-group">
+              {[
+                {
+                  label: "First Contentful Paint",
+                  key: "first-contentful-paint",
+                },
+                {
+                  label: "Largest Contentful Paint",
+                  key: "largest-contentful-paint",
+                },
+                { label: "Speed Index", key: "speed-index" },
+                { label: "Time to Interactive", key: "interactive" },
+                { label: "Total Blocking Time", key: "total-blocking-time" },
+                {
+                  label: "Cumulative Layout Shift",
+                  key: "cumulative-layout-shift",
+                },
+              ].map((item, i) => (
+                <li
+                  key={i}
+                  className="list-group-item d-flex justify-content-between"
+                >
+                  <strong>{item.label}</strong>
+                  <span>
+                    {result?.lighthouseResult?.audits[item.key]?.displayValue ||
+                      "N/A"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {httpsData && (
+            <div className="mt-5">
+              <h4 className="mb-3">HTTPS Check</h4>
+              <table className="table table-bordered">
+                <tbody>
+                  <tr>
+                    <th scope="row">Is HTTPS</th>
+                    <td>{httpsData.isHTTPS ? "Yes" : "No"}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Secure</th>
+                    <td>{httpsData.secure ? "Yes" : "No"}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Message</th>
+                    <td>{httpsData.message}</td>
+                  </tr>
+                  {httpsData.certificate && (
+                    <>
+                      <tr>
+                        <th scope="row">Valid From</th>
+                        <td>{httpsData.certificate.validFrom}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Valid To</th>
+                        <td>{httpsData.certificate.validTo}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Days Left</th>
+                        <td>{httpsData.certificate.daysLeft}</td>
+                      </tr>
+                    </>
+                  )}
+                </tbody>
+              </table>
             </div>
+          )}
 
-            {/* Strategy Section */}
-            <div className="mt-4">
-              <h5>Strategy</h5>
+          {whoisData && (
+            <div className="mt-5">
+              <h4 className="mb-3">WHOIS Information</h4>
               <ul className="list-group">
                 <li className="list-group-item">
-                  <strong>First Contentful Paint:</strong>{" "}
-                  {result.lighthouseResult.audits["first-contentful-paint"]
-                    ?.displayValue || "N/A"}
+                  <strong>Domain:</strong> {whoisData.domainName}
                 </li>
                 <li className="list-group-item">
-                  <strong>Largest Contentful Paint:</strong>{" "}
-                  {result.lighthouseResult.audits["largest-contentful-paint"]
-                    ?.displayValue || "N/A"}
+                  <strong>Owner:</strong> {whoisData.owner}
                 </li>
                 <li className="list-group-item">
-                  <strong>Speed Index:</strong>{" "}
-                  {result.lighthouseResult.audits["speed-index"]
-                    ?.displayValue || "N/A"}
-                </li>
-                <li className="list-group-item">
-                  <strong>Time to Interactive:</strong>{" "}
-                  {result.lighthouseResult.audits["interactive"]
-                    ?.displayValue || "N/A"}
-                </li>
-                <li className="list-group-item">
-                  <strong>Total Blocking Time:</strong>{" "}
-                  {result.lighthouseResult.audits["total-blocking-time"]
-                    ?.displayValue || "N/A"}
-                </li>
-                <li className="list-group-item">
-                  <strong>Cumulative Layout Shift:</strong>{" "}
-                  {result.lighthouseResult.audits["cumulative-layout-shift"]
-                    ?.displayValue || "N/A"}
+                  <strong>Registrar:</strong> {whoisData.registrar}
                 </li>
               </ul>
             </div>
+          )}
 
-            {/* WHOIS Data Section */}
-            <div>{httpsData.message}</div>
-
-            <button className="btn btn-primary mt-4" onClick={downloadPDF}>
-              Download PDF
-            </button>
-          </div>
-        </div>
+          {Metadetails?.success && (
+            <div className="mt-5">
+              <h4 className="mb-3">Meta Tag Details</h4>
+              <table className="table table-hover">
+                <tbody>
+                  {Object.entries(Metadetails.meta).map(([key, value], i) => (
+                    <tr key={i}>
+                      <th>{key}</th>
+                      <td>{value || "N/A"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
