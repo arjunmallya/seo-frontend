@@ -15,9 +15,12 @@ function App() {
 
   const whoIsinfo = async () => {
     try {
-      const response = await axios.post("http://localhost:5000/api/whois", {
-        url: url,
-      });
+      const response = await axios.post(
+        "https://seo-backend-ork1.onrender.com/api/whois",
+        {
+          url: url,
+        }
+      );
       setWhoisData(response.data); // Store clean WHOIS data
       console.log("WHOIS Data:", response.data);
     } catch (error) {
@@ -28,9 +31,12 @@ function App() {
 
   const httpsCheck = async () => {
     try {
-      const res = await axios.post("http://localhost:5000/api/httpscheck", {
-        siteUrl: url,
-      });
+      const res = await axios.post(
+        "https://seo-backend-ork1.onrender.com/api/httpscheck",
+        {
+          siteUrl: url,
+        }
+      );
       setHttpsData(res.data);
       console.log("HTTPS Data:", httpsData);
     } catch (error) {
@@ -43,9 +49,12 @@ function App() {
     setResult(null);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/seo-audit", {
-        url,
-      });
+      const res = await axios.post(
+        "https://seo-backend-ork1.onrender.com/api/seo-audit",
+        {
+          url,
+        }
+      );
       setResult(res.data);
     } catch (err) {
       setError("Failed to fetch results. Please enter a valid URL.");
@@ -57,7 +66,7 @@ function App() {
     setMetadetails(null);
     try {
       const res = await axios.post(
-        "http://localhost:5000/api/metataganalysis",
+        "https://seo-backend-ork1.onrender.com/api/metataganalysis",
         {
           url,
         }
@@ -289,7 +298,7 @@ function App() {
 
   return (
     <div className="container py-5">
-      <h2 className="text-center mb-4">SEO Audit Tool with PageSpeed API</h2>
+      <h2 className="text-center mb-4">SEO Audit Tool</h2>
 
       <form onSubmit={handleSubmit} className="mb-4">
         <div className="input-group">
