@@ -16,7 +16,7 @@ function App() {
   const whoIsinfo = async () => {
     try {
       const response = await axios.post(
-        "https://seo-backend-ork1.onrender.com/api/whois",
+        "https://seo.smgsdigimarketers.in/api/whois",
         {
           url: url,
         }
@@ -32,7 +32,7 @@ function App() {
   const httpsCheck = async () => {
     try {
       const res = await axios.post(
-        "https://seo-backend-ork1.onrender.com/api/httpscheck",
+        "https://seo.smgsdigimarketers.in/api/httpscheck",
         {
           siteUrl: url,
         }
@@ -50,7 +50,7 @@ function App() {
 
     try {
       const res = await axios.post(
-        "https://seo-backend-ork1.onrender.com/api/seo-audit",
+        "https://seo.smgsdigimarketers.in/api/seo-audit",
         {
           url,
         }
@@ -66,7 +66,7 @@ function App() {
     setMetadetails(null);
     try {
       const res = await axios.post(
-        "https://seo-backend-ork1.onrender.com/api/metataganalysis",
+        "https://seo.smgsdigimarketers.in/api/metataganalysis",
         {
           url,
         }
